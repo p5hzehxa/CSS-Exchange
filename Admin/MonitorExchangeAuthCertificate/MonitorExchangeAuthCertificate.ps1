@@ -89,6 +89,11 @@ param(
 
     [Parameter(Mandatory = $false, ParameterSetName = "MonitorExchangeAuthCertificateManually")]
     [Parameter(Mandatory = $false, ParameterSetName = "ConfigureAutomaticExecutionViaScheduledTask")]
+    [ValidateScript({ $_ -ge 0 })]
+    [int]$CustomCertificateLifetimeInDays = 0,
+
+    [Parameter(Mandatory = $false, ParameterSetName = "MonitorExchangeAuthCertificateManually")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ConfigureAutomaticExecutionViaScheduledTask")]
     [bool]$IgnoreUnreachableServers = $false,
 
     [Parameter(Mandatory = $false, ParameterSetName = "MonitorExchangeAuthCertificateManually")]
@@ -169,7 +174,7 @@ function Main {
     param()
 
     if (-not(Confirm-Administrator)) {
-        Write-Warning ("The script needs to be executed in elevated mode. Start the Exchange Management Shell as an Administrator.")
+        Write-Warning ("The script must be executed in elevated mode. Start the Exchange Management Shell as an administrator.")
         $Error.Clear()
         Start-Sleep -Seconds 2
         exit
@@ -460,9 +465,10 @@ function Main {
             Write-Host ("Renewal scenario: $($renewalActionWording)")
             if ($authCertStatus.ReplaceRequired) {
                 $replaceExpiredAuthCertificateParams = @{
-                    ReplaceExpiredAuthCertificate = $true
-                    CatchActionFunction           = ${Function:Invoke-CatchActions}
-                    WhatIf                        = $WhatIfPreference
+                    ReplaceExpiredAuthCertificate    = $true
+                    NewAuthCertificateLifetimeInDays = $CustomCertificateLifetimeInDays
+                    CatchActionFunction              = ${Function:Invoke-CatchActions}
+                    WhatIf                           = $WhatIfPreference
                 }
                 $renewalActionResult = New-ExchangeAuthCertificate @replaceExpiredAuthCertificateParams
 
@@ -471,6 +477,7 @@ function Main {
             } elseif ($authCertStatus.ConfigureNextAuthRequired) {
                 $configureNextAuthCertificateParams = @{
                     ConfigureNextAuthCertificate         = $true
+                    NewAuthCertificateLifetimeInDays     = $CustomCertificateLifetimeInDays
                     CurrentAuthCertificateLifetimeInDays = $authCertStatus.CurrentAuthCertificateLifetimeInDays
                     CatchActionFunction                  = ${Function:Invoke-CatchActions}
                     WhatIf                               = $WhatIfPreference
