@@ -18,11 +18,11 @@ function New-ExchangeAuthCertificate {
         [switch]$ConfigureNextAuthCertificate,
 
         [Parameter(Mandatory = $true, ParameterSetName = "NewNextAuthCert")]
-        [ValidateScript({ $_ -ge 0 })]
         [int]$CurrentAuthCertificateLifetimeInDays,
 
         [Parameter(Mandatory = $false, ParameterSetName = "NewPrimaryAuthCert")]
         [Parameter(Mandatory = $false, ParameterSetName = "NewNextAuthCert")]
+        [ValidateScript({ $_ -ge 0 })]
         [int]$NewAuthCertificateLifetimeInDays,
 
         [Parameter(Mandatory = $false, ParameterSetName = "NewPrimaryAuthCert")]
