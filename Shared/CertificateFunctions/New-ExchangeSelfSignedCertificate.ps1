@@ -66,6 +66,10 @@ function New-ExchangeSelfSignedCertificate {
         $hashAlgorithmName = [System.Security.Cryptography.HashAlgorithmName]::new($HashAlgorithm)
         Write-Verbose "HashAlgorithm: $($hashAlgorithmName.Name)"
 
+        # Generate a unique name for the key container
+        $keyContainerName = "MonitorExchangeAuthCertificate_$((New-Guid).Guid.ToString())"
+        Write-Verbose "Key container name is: $keyContainerName"
+
         if ($AlgorithmType -eq "ECC") {
             Write-Verbose "ECC-based certificate will be created"
 
@@ -108,7 +112,7 @@ function New-ExchangeSelfSignedCertificate {
                 $cspParams.Flags = [System.Security.Cryptography.CspProviderFlags]::UseMachineKeyStore
                 $cspParams.ProviderType = 24 # PROV_RSA_FULL
                 $cspParams.KeyNumber = 1 # AT_KEYEXCHANGE
-                $cspParams.KeyContainerName = (New-Guid).Guid.ToString()
+                $cspParams.KeyContainerName = $keyContainerName
                 #cspell:enable
 
                 Write-Verbose "Generating the public/private RSA key pair..."
@@ -118,7 +122,7 @@ function New-ExchangeSelfSignedCertificate {
                     $cspParams
                 )
 
-                # Ensure the RSA private key persists beyond the current session
+                # Ensure the RSA private key persists beyond the current session (stores the key in the cryptographic service provider container)
                 $rsa.PersistKeyInCsp = $true
             } else {
                 Write-Verbose "Initializing the CngKeyCreationParameters..."
@@ -131,9 +135,6 @@ function New-ExchangeSelfSignedCertificate {
                 $cngKeyCreationParameters.KeyCreationOptions = [System.Security.Cryptography.CngKeyCreationOptions]::OverwriteExistingKey
                 $cngKeyCreationParameters.ExportPolicy = [System.Security.Cryptography.CngExportPolicies]::AllowExport
 
-                # Generate a unique name for the key as we can't create it as an ephemeral key for whatever reason
-                $cngKeyName = (New-Guid).Guid.ToString()
-
                 # Add RSA-specific CngProperty for the key size
                 Write-Verbose "RSA key size: $KeySize"
                 $cngKeyLengthProperty = [System.Security.Cryptography.CngProperty]::new(
@@ -145,15 +146,15 @@ function New-ExchangeSelfSignedCertificate {
                 Write-Verbose "Adding RSA-specific KeyLength property"
                 $cngKeyCreationParameters.Parameters.Add($cngKeyLengthProperty)
 
-                # Creates a named CngKey object that provides the specified algorithm and keyName making the key persistent, using the supplied key creation parameter
+                # Create a new RSA key pair and store it in the CNG key store with the specified parameters
                 Write-Verbose "Creating the RSA-based CngKey..."
                 $cngKey = [System.Security.Cryptography.CngKey]::Create(
-                    [System.Security.Cryptography.CngAlgorithm]::Rsa,
-                    $cngKeyName,
-                    $cngKeyCreationParameters
+                    [System.Security.Cryptography.CngAlgorithm]::Rsa, # Specifies RSA algorithm
+                    $keyContainerName, # Name of the key container
+                    $cngKeyCreationParameters # Creation options
                 )
 
-                # Generate the public/private RSA key pair
+                # Wrap the existing CNG key in an RSACng object for cryptographic operations
                 Write-Verbose "Generating the public/private RSA key pair..."
                 $rsa = [System.Security.Cryptography.RSACng]::new($cngKey)
             }
@@ -254,7 +255,9 @@ function New-ExchangeSelfSignedCertificate {
                 $certificate.FriendlyName = $utf8FriendlyName
             }
 
-            Write-Verbose "Certificate was created successfully. Thumbprint: $($certificate.Thumbprint)"
+            $certificateThumbprint = $certificate.Thumbprint
+
+            Write-Verbose "Certificate was created successfully - Thumbprint: $certificateThumbprint Subject: $($subject.Name)"
         } catch {
             Write-Host "Something went wrong while creating the self-signed certificate. Exception: $_" -ForegroundColor Red
 
@@ -319,26 +322,33 @@ function New-ExchangeSelfSignedCertificate {
             }
         }
     } end {
-        if ($null -ne $cngKeyName) {
-            Write-Verbose "Deleting CngKey object..."
-            ([System.Security.Cryptography.CngKey]::Open($cngKeyName)).Delete()
-        }
-
-        if ($null -ne $ecdsa) {
-            # Dispose the ECC key
-            Write-Verbose "Disposing ECDsa key object..."
-            $ecdsa.Dispose()
+        if ($null -ne $certificate) {
+            Write-Verbose "Disposing X509Certificate2 object..."
+            # Call Dispose() to release all resources used by the X509Certificate object
+            $certificate.Dispose()
         }
 
         if ($null -ne $rsa) {
-            # Dispose the RSA key
-            Write-Verbose "Disposing RSA key object..."
-            $rsa.Dispose()
+            Write-Verbose "Clearing and disposing RSA key object..."
+            # Call Clear() to release resources and delete the key from the container
+            $rsa.Clear()
+        }
+
+        if ($null -ne $ecdsa) {
+            # Call Clear() to release resources and delete the key from the container
+            Write-Verbose "Clearing and disposing ECDsa key object..."
+            $ecdsa.Clear()
+        }
+
+        if ($null -ne $cngKey) {
+            # Call Delete() to remove the key that is associated with the object
+            Write-Verbose "Deleting CngKey object..."
+            $cngKey.Delete()
         }
 
         return [PSCustomObject]@{
-            Subject    = $certificate.Subject
-            Thumbprint = $certificate.Thumbprint
+            Subject    = $subject.Name
+            Thumbprint = $certificateThumbprint
         }
     }
 }

@@ -427,7 +427,7 @@ function Main {
 
     if ($ValidateAndRenewAuthCertificate) {
         Write-Host ("Mode: Testing and replacing or importing the Auth Certificate (if required)")
-    } else {
+    } elseif ($EnforceNewAuthCertificateCreation) {
         Write-Host ("Mode: Enforce new next Auth Certificate creation")
     } else {
         Write-Host ("The script was run without parameter therefore, only a check of the Auth Certificate configuration is performed and no change will be made")
