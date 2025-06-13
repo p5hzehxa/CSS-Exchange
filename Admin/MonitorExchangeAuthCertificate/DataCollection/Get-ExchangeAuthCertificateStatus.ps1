@@ -163,7 +163,7 @@ function Get-ExchangeAuthCertificateStatus {
                     # Scenario 1: Current Auth Certificate has expired and no next Auth Certificate defined or the next Auth Certificate has expired
                     $replaceRequired = $true
                 } elseif (((($currentAuthCertificateValidInDays -ge 0) -and
-                        ($currentAuthCertificateValidInDays -le 60)) -and
+                    ($currentAuthCertificateValidInDays -le 60)) -and
                     (($nextAuthCertificateValidInDays -le 0) -or
                     ($nextAuthCertificateValidInDays -le 120)) -and
                     ($currentAuthCertificateMissingOnServersList.Count -eq 0) -and

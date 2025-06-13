@@ -72,6 +72,17 @@
     .\MonitorExchangeAuthCertificate.ps1 -ValidateAndRenewAuthCertificate $true -Confirm:$false
     Runs the script in renewal mode without user interaction. The Auth Certificate renewal action will be performed (if required).
     In unattended mode the internal SMTP certificate will be replaced with the new Auth Certificate and is then set back to the previous one.
+    The new Auth Certificate, which is eventually created, will have a lifetime of 5 years.
+.EXAMPLE
+    .\MonitorExchangeAuthCertificate.ps1 -ValidateAndRenewAuthCertificate $true -CustomCertificateLifetimeInDays 365 -Confirm:$false
+    Runs the script in renewal mode without user interaction. The Auth Certificate renewal action will be performed (if required).
+    In unattended mode the internal SMTP certificate will be replaced with the new Auth Certificate and is then set back to the previous one.
+    The new Auth Certificate, which is eventually created, will be created with a lifetime of 365 days (1 year).
+.EXAMPLE
+    .\MonitorExchangeAuthCertificate.ps1 -EnforceNewAuthCertificateCreation -CustomCertificateLifetimeInDays 365 -Confirm:$false
+    Runs the script in Auth Certificate enforcement mode.A new Auth Certificate is created and staged as new next Auth Certificate.
+    The Exchange AuthAdmin servicelet will publish the newly created Auth Certificate as soon as it processes it the next time (usually in a 12 hour timeframe).
+    The new Auth Certificate, which is created, will be created with a lifetime of 365 days (1 year).
 .EXAMPLE
     .\MonitorExchangeAuthCertificate.ps1 -ValidateAndRenewAuthCertificate $true -IgnoreUnreachableServers $true -Confirm:$false
     Runs the script in renewal mode without user interaction. We only take the Exchange server into account which are reachable and will perform
@@ -417,6 +428,8 @@ function Main {
     if ($ValidateAndRenewAuthCertificate) {
         Write-Host ("Mode: Testing and replacing or importing the Auth Certificate (if required)")
     } else {
+        Write-Host ("Mode: Enforce new next Auth Certificate creation")
+    } else {
         Write-Host ("The script was run without parameter therefore, only a check of the Auth Certificate configuration is performed and no change will be made")
     }
 
@@ -489,10 +502,12 @@ function Main {
                 $emailBodyRenewalScenario = "The Auth Certificate in use was invalid (expired) or not available on all Exchange Servers within your organization.<BR>" +
                 "It was immediately replaced by a new one which is already active.<BR><BR>"
             } elseif ($authCertStatus.ConfigureNextAuthRequired) {
+                # Set CurrentAuthCertificateLifetimeInDays to 2 in case that EnforceNewAuthCertificateCreation was used
+                # We do that to ensure that the new Auth Certificate will become next time the AuthAdmin servicelet processess it
                 $configureNextAuthCertificateParams = @{
                     ConfigureNextAuthCertificate         = $true
                     NewAuthCertificateLifetimeInDays     = $CustomCertificateLifetimeInDays
-                    CurrentAuthCertificateLifetimeInDays = $authCertStatus.CurrentAuthCertificateLifetimeInDays
+                    CurrentAuthCertificateLifetimeInDays = if ($EnforceNewAuthCertificateCreation) { 2 } else { $authCertStatus.CurrentAuthCertificateLifetimeInDays }
                     CatchActionFunction                  = ${Function:Invoke-CatchActions}
                     WhatIf                               = $WhatIfPreference
                 }
