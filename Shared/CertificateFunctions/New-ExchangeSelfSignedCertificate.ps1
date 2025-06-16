@@ -68,7 +68,6 @@ function New-ExchangeSelfSignedCertificate {
 
         # Generate a unique name for the key container
         $keyContainerName = "MonitorExchangeAuthCertificate_$((New-Guid).Guid.ToString())"
-        Write-Verbose "Key container name is: $keyContainerName"
 
         if ($AlgorithmType -eq "ECC") {
             Write-Verbose "ECC-based certificate will be created"
@@ -199,7 +198,7 @@ function New-ExchangeSelfSignedCertificate {
             $keyUsageExtensions = [System.Security.Cryptography.X509Certificates.X509KeyUsageExtension]::new(
                 [System.Security.Cryptography.X509Certificates.X509KeyUsageFlags]::DigitalSignature -bor # DigitalSignature: The certificate's public key can be used to verify digital signatures
                 [System.Security.Cryptography.X509Certificates.X509KeyUsageFlags]::KeyEncipherment, # KeyEncipherment: The public key can also be used to encrypt symmetric keys
-                $true # critical: marked as critical
+                $true # critical? marked as critical
             )
 
             $certificateRequest.CertificateExtensions.Add($keyUsageExtensions)
@@ -210,7 +209,7 @@ function New-ExchangeSelfSignedCertificate {
 
             $extendedKeyUsageExtension = [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]::new(
                 $oids, # OID for Server Authentication
-                $false # not critical: marked as not critical
+                $false # critical? marked as not critical
             )
 
             $certificateRequest.CertificateExtensions.Add($extendedKeyUsageExtension)
@@ -220,7 +219,7 @@ function New-ExchangeSelfSignedCertificate {
                 $false, # certificateAuthority: this is not a CA
                 $false, # hasPathLengthConstraint: we don't want to enforce one
                 0, # pathLengthConstraint: ignored since hasPathLengthConstraint is false
-                $true # critical: marked as critical
+                $true # critical? marked as critical
             )
 
             $certificateRequest.CertificateExtensions.Add($basicConstraints)

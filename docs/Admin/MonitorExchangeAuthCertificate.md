@@ -103,7 +103,7 @@ The following syntax executes the script in scheduled task mode, but it doesn't 
 PS C:\> .\MonitorExchangeAuthCertificate.ps1 -ConfigureScriptToRunViaScheduledTask -AutomationAccountCredential (Get-Credential) -SendEmailNotificationTo "John.Doe@contoso.com"
 ```
 
-The following syntax runs the script in Auth Certificate enforcement mode. In this mode, the script creates a new Auth Certificate (in this example, with a custom lifetime of 1 year) and stages it as the new next Auth Certificate. An existing new next Auth Certificate will be overwritten by the new one. The new Auth Certificate will become active as soon as the Exchange AuthAdmin servicelet processess it the next time (usually within a 12 hour timeframe).
+The following syntax runs the script in Auth Certificate enforcement mode. In this mode, the script creates a new Auth Certificate (in this example, with a custom lifetime of 1 year) and stages it as the new next Auth Certificate. An existing new next Auth Certificate will be overwritten by the new one. The new Auth Certificate will become active as soon as the Exchange AuthAdmin servicelet processes it the next time (usually within a 12 hour timeframe).
 
 ```powershell
 PS C:\> .\MonitorExchangeAuthCertificate.ps1 -EnforceNewAuthCertificateCreation -CustomCertificateLifetimeInDays 365 -Confirm:$false

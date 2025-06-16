@@ -81,7 +81,7 @@
 .EXAMPLE
     .\MonitorExchangeAuthCertificate.ps1 -EnforceNewAuthCertificateCreation -CustomCertificateLifetimeInDays 365 -Confirm:$false
     Runs the script in Auth Certificate enforcement mode.A new Auth Certificate is created and staged as new next Auth Certificate.
-    The Exchange AuthAdmin servicelet will publish the newly created Auth Certificate as soon as it processes it the next time (usually in a 12 hour timeframe).
+    The Exchange AuthAdmin servicelet will publish the newly created Auth Certificate as soon as it processes it the next time (usually in a 12 hour time frame).
     The new Auth Certificate, which is created, will be created with a lifetime of 365 days (1 year).
 .EXAMPLE
     .\MonitorExchangeAuthCertificate.ps1 -ValidateAndRenewAuthCertificate $true -IgnoreUnreachableServers $true -Confirm:$false
@@ -503,7 +503,7 @@ function Main {
                 "It was immediately replaced by a new one which is already active.<BR><BR>"
             } elseif ($authCertStatus.ConfigureNextAuthRequired) {
                 # Set CurrentAuthCertificateLifetimeInDays to 2 in case that EnforceNewAuthCertificateCreation was used
-                # We do that to ensure that the new Auth Certificate will become next time the AuthAdmin servicelet processess it
+                # We do that to ensure that the new Auth Certificate will become active next time the AuthAdmin servicelet processes it
                 $configureNextAuthCertificateParams = @{
                     ConfigureNextAuthCertificate         = $true
                     NewAuthCertificateLifetimeInDays     = $CustomCertificateLifetimeInDays
