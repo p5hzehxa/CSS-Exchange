@@ -4,8 +4,7 @@
 . $PSScriptRoot\..\Confirm-Administrator.ps1
 
 function New-ExchangeSelfSignedCertificate {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Certificate creation is intentional and controlled')]
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [ValidateScript({ $_.Length -lt 64 })]
         [string]$SubjectName = $env:COMPUTERNAME,
@@ -81,7 +80,9 @@ function New-ExchangeSelfSignedCertificate {
 
             try {
                 Write-Verbose "Generating key by using $CurveName curve"
-                $ecdsa.GenerateKey($curve)
+                if ($PSCmdlet.ShouldProcess("Generating private key ($AlgorithmType)")) {
+                    $ecdsa.GenerateKey($curve)
+                }
 
                 # Generate the ECC CertificateRequest
                 Write-Verbose "Generating the ECC CertificateRequest..."
@@ -116,13 +117,15 @@ function New-ExchangeSelfSignedCertificate {
 
                 Write-Verbose "Generating the public/private RSA key pair..."
                 # Initializes a new instance of RSACryptoServiceProvider to generate a new key pair, pass KeySize and CspParameters
-                $rsa = [System.Security.Cryptography.RSACryptoServiceProvider]::new(
-                    $KeySize,
-                    $cspParams
-                )
+                if ($PSCmdlet.ShouldProcess("Generating private key ($AlgorithmType)")) {
+                    $rsa = [System.Security.Cryptography.RSACryptoServiceProvider]::new(
+                        $KeySize,
+                        $cspParams
+                    )
 
-                # Ensure the RSA private key persists beyond the current session (stores the key in the cryptographic service provider container)
-                $rsa.PersistKeyInCsp = $true
+                    # Ensure the RSA private key persists beyond the current session (stores the key in the cryptographic service provider container)
+                    $rsa.PersistKeyInCsp = $true
+                }
             } else {
                 Write-Verbose "Initializing the CngKeyCreationParameters..."
 
@@ -155,19 +158,23 @@ function New-ExchangeSelfSignedCertificate {
 
                 # Wrap the existing CNG key in an RSACng object for cryptographic operations
                 Write-Verbose "Generating the public/private RSA key pair..."
-                $rsa = [System.Security.Cryptography.RSACng]::new($cngKey)
+                if ($PSCmdlet.ShouldProcess("Generating private key ($AlgorithmType)")) {
+                    $rsa = [System.Security.Cryptography.RSACng]::new($cngKey)
+                }
             }
 
             try {
                 Write-Verbose "Generating the RSA CertificateRequest..."
 
                 # Initializes a new instance of the CertificateRequest class using the specified subject name, RSA key, hash algorithm, and using PKCS #1 v1.5 padding
-                $certificateRequest = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
-                    $subject,
-                    $rsa,
-                    $hashAlgorithmName,
-                    [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
-                )
+                if ($PSCmdlet.ShouldProcess("Generating RSA certificate request")) {
+                    $certificateRequest = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+                        $subject,
+                        $rsa,
+                        $hashAlgorithmName,
+                        [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+                    )
+                }
             } catch {
                 Write-Host "Something went wrong while creating the CertificateRequest. Exception $_" -ForegroundColor Red
 
@@ -186,9 +193,11 @@ function New-ExchangeSelfSignedCertificate {
                 $sanBuilder.AddDnsName($name)
             }
 
-            $certificateRequest.CertificateExtensions.Add(
-                $sanBuilder.Build($true)
-            )
+            if ($PSCmdlet.ShouldProcess("Adding $($DomainName.Count) DnsName(s) to SAN extension")) {
+                $certificateRequest.CertificateExtensions.Add(
+                    $sanBuilder.Build($true)
+                )
+            }
         }
 
         try {
@@ -201,7 +210,9 @@ function New-ExchangeSelfSignedCertificate {
                 $true # critical? marked as critical
             )
 
-            $certificateRequest.CertificateExtensions.Add($keyUsageExtensions)
+            if ($PSCmdlet.ShouldProcess("Adding the X509KeyUsageExtension")) {
+                $certificateRequest.CertificateExtensions.Add($keyUsageExtensions)
+            }
 
             # Specify the X509EnhancedKeyUsageExtension
             $oids = [System.Security.Cryptography.OidCollection]::new()
@@ -212,7 +223,9 @@ function New-ExchangeSelfSignedCertificate {
                 $false # critical? marked as not critical
             )
 
-            $certificateRequest.CertificateExtensions.Add($extendedKeyUsageExtension)
+            if ($PSCmdlet.ShouldProcess("Adding the X509EnhancedKeyUsageExtension")) {
+                $certificateRequest.CertificateExtensions.Add($extendedKeyUsageExtension)
+            }
 
             # Specify the X509BasicConstraintsExtension
             $basicConstraints = [System.Security.Cryptography.X509Certificates.X509BasicConstraintsExtension]::new(
@@ -222,7 +235,9 @@ function New-ExchangeSelfSignedCertificate {
                 $true # critical? marked as critical
             )
 
-            $certificateRequest.CertificateExtensions.Add($basicConstraints)
+            if ($PSCmdlet.ShouldProcess("Adding the X509BasicConstraintsExtension")) {
+                $certificateRequest.CertificateExtensions.Add($basicConstraints)
+            }
 
             # Add the Subject Key Identifier (SKI) as a non-critical extensions if AddSubjectKeyIdentifier parameter was set to true
             if ($AddSubjectKeyIdentifier) {
@@ -231,7 +246,9 @@ function New-ExchangeSelfSignedCertificate {
                     $false
                 )
 
-                $certificateRequest.CertificateExtensions.Add($subjectKeyIdentifier)
+                if ($PSCmdlet.ShouldProcess("Adding Subject Key Identifier (SKI)")) {
+                    $certificateRequest.CertificateExtensions.Add($subjectKeyIdentifier)
+                }
             }
         } catch {
             Write-Host "Something went wrong while processing certificate extensions. Exception: $_" -ForegroundColor Red
@@ -245,16 +262,28 @@ function New-ExchangeSelfSignedCertificate {
 
             $notBefore = [System.DateTimeOffset]::UtcNow
             $notAfter = $notBefore.AddDays($LifetimeInDays)
-            $certificate = $certificateRequest.CreateSelfSigned(
-                $notBefore,
-                $notAfter
-            )
+            if ($PSCmdlet.ShouldProcess("Creating self-signed certificate for '$($subject.Name)'")) {
+                $certificate = $certificateRequest.CreateSelfSigned(
+                    $notBefore,
+                    $notAfter
+                )
+            }
 
             if (-not([System.String]::IsNullOrEmpty($utf8FriendlyName))) {
-                $certificate.FriendlyName = $utf8FriendlyName
+                if ($PSCmdlet.ShouldProcess("Adding FriendlyName $utf8FriendlyName")) {
+                    certificate.FriendlyName = $utf8FriendlyName
+                }
             }
 
             $certificateThumbprint = $certificate.Thumbprint
+
+
+            if ($PSCmdlet.ShouldProcess("Setting certificate thumbprint")) {
+                $certificateThumbprint = $certificate.Thumbprint
+            } else {
+                # Mock certificate thumbprint
+                $certificateThumbprint = "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678"
+            }
 
             Write-Verbose "Certificate was created successfully - Thumbprint: $certificateThumbprint Subject: $($subject.Name)"
         } catch {
@@ -266,18 +295,19 @@ function New-ExchangeSelfSignedCertificate {
         try {
             # To make the certificate and its private key exportable, we must export and re-import it with the Exportable flag
             Write-Verbose "Exporting and re-importing certificate with Exportable flag to make it exportable..."
-
-            $pfxBytes = $certificate.Export(
-                [System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx
-            )
-            $certificateWithExportableKey = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new()
-            $certificateWithExportableKey.Import(
-                $pfxBytes,
-                $null,
-                ([System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable -bor
-                [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor
-                [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet)
-            )
+            if ($PSCmdlet.ShouldProcess("Making certificate exportable")) {
+                $pfxBytes = $certificate.Export(
+                    [System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx
+                )
+                $certificateWithExportableKey = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new()
+                $certificateWithExportableKey.Import(
+                    $pfxBytes,
+                    $null,
+                    ([System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable -bor
+                    [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::PersistKeySet -bor
+                    [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet)
+                )
+            }
 
             # Add it to the LocalMachine store
             Write-Verbose "Adding the certificate to the My/LocalMachine certificate store..."
@@ -286,9 +316,12 @@ function New-ExchangeSelfSignedCertificate {
                 "My",
                 "LocalMachine"
             )
-            $machineStore.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-            $machineStore.Add($certificateWithExportableKey)
-            $machineStore.Close()
+
+            if ($PSCmdlet.ShouldProcess("Adding certificate to LocalMachine\My store")) {
+                $machineStore.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+                $machineStore.Add($certificateWithExportableKey)
+                $machineStore.Close()
+            }
 
             # Add the certificate to the Trusted Root Certification Authorities if explicitly specified via TrustCertificate parameter
             if ($TrustCertificate) {
@@ -298,9 +331,12 @@ function New-ExchangeSelfSignedCertificate {
                     "Root",
                     "LocalMachine"
                 )
-                $trustedRootStore.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-                $trustedRootStore.Add($certificateWithExportableKey)
-                $trustedRootStore.Close()
+
+                if ($TrustCertificate -and $PSCmdlet.ShouldProcess("Adding certificate to LocalMachine\Root store")) {
+                    $trustedRootStore.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+                    $trustedRootStore.Add($certificateWithExportableKey)
+                    $trustedRootStore.Close()
+                }
             }
         } catch {
             Write-Host "Something went wrong while adding the certificate to the store. Exception: $_" -ForegroundColor Red
