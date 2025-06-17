@@ -271,7 +271,7 @@ function New-ExchangeSelfSignedCertificate {
 
             if (-not([System.String]::IsNullOrEmpty($utf8FriendlyName))) {
                 if ($PSCmdlet.ShouldProcess("Adding FriendlyName $utf8FriendlyName")) {
-                    certificate.FriendlyName = $utf8FriendlyName
+                    $certificate.FriendlyName = $utf8FriendlyName
                 }
             }
 
